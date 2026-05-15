@@ -1,5 +1,5 @@
 import './App.css';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { auth, db, logout, loginUser, registerUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -137,28 +137,31 @@ const CityLookup = ({ value, onChange }) => {
       setIsLoading(true);
       try {
         const response = await fetch(
-          `https://secure.geonames.org/searchJSON?q=${query}&maxRows=5&username=demo&countryBias=GB&featureClass=P`
-        );
-        const data = await response.json();
+          `https://secure.geonames.org/searchJSON?name_startsWith=${query}&maxRows=5&username=jamestilburn&countryBias=GB&featureClass=P&isNameRequired=true`
+        );        
+        const data = await response.json(); 
+        
+        // Corrected parsing logic to ensure names are extracted properly
         const names = data.geonames
           ? [...new Set(data.geonames.map((g) => g.name))]
           : [];
         setSuggestions(names);
       } catch (err) {
-        console.error(err);
+        console.error("City search failed:", err);
       } finally {
         setIsLoading(false);
       }
     }, 400);
     return () => clearTimeout(timer);
   }, [query]);
+  
 
   return (
     <div className="town-wrap">
       <input
         className="input"
         value={query}
-        placeholder="Search UK town/city..."
+
         onChange={(e) => {
           setQuery(e.target.value);
           onChange(e.target.value);
@@ -230,7 +233,7 @@ const DenomInput = ({ value, onChange }) => {
   return (
     <div className="score-input-wrap">
       <div className="score-input-row">
-        <span className="score-eight">8 /</span>
+        <span className="score-eight">8 out of </span>
         <input
           type="number"
           min={8}
@@ -241,9 +244,6 @@ const DenomInput = ({ value, onChange }) => {
         />
       </div>
       <div className="score-meta">
-        <span className="score-hint">
-          Vary the denominator. The lower, the better the score.
-        </span>
         <span
           className="score-pct"
           style={{ color: getScoreColor(parseInt(raw)) }}
@@ -331,33 +331,41 @@ const AddBeerModal = ({ onAdd, onClose }) => {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="modal">
-        <div className="modal-header">
-          <span className="modal-title">Log a beer</span>
-          <button className="modal-close" onClick={onClose}>
-            ×
-          </button>
-        </div>
+        <h2 className="modal-header">
+          <span className="modal-title">Logging a new beer</span>
+        </h2>
         <div className="form">
           <div className="field">
             <label className="label">Beer Name</label>
+            <span className="field-hint">For example Landlord</span>
             <input
               className="input"
-              placeholder="e.g. Doom Bar"
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
           <div className="field">
             <label className="label">Brewery</label>
+            <span className="field-hint">For example Timothy Taylor</span>
             <input
               className="input"
-              placeholder="e.g. Sharp's"
               onChange={(e) => setForm({ ...form, brewery: e.target.value })}
             />
           </div>
+          <div className="field">
+  <label className="label">Your Score</label>
+  <div className="score-input-group">
 
+    <DenomInput
+      value={form.denom}
+      onChange={(v) => setForm({ ...form, denom: v })}
+    />
+  </div>
+</div>
+
+<h3 className="modal-header">Optional details</h3>
           <div className="field-row">
             <div className="field">
-              <label className="label">Style (optional)</label>
+              <label className="label">Style</label>
               <select
                 className="select"
                 value={form.style}
@@ -371,36 +379,38 @@ const AddBeerModal = ({ onAdd, onClose }) => {
               </select>
             </div>
             <div className="field">
-              <label className="label">ABV % (optional)</label>
+              <label className="label">ABV</label>
+              <div className="input-suffix-wrapper">
               <input
                 className="input"
                 type="number"
                 step="0.1"
                 onChange={(e) => setForm({ ...form, abv: e.target.value })}
               />
+                 <span className="input-suffix">%</span>
+  </div>
             </div>
           </div>
           <div className="field">
-            <label className="label">Town / City (optiomal)</label>
+            <label className="label">Town / City</label>
             <CityLookup
               value={form.town}
               onChange={(v) => setForm({ ...form, town: v })}
             />
           </div>
-          <div className="field">
-            <label className="label">Your Score</label>
-            <DenomInput
-              value={form.denom}
-              onChange={(v) => setForm({ ...form, denom: v })}
-            />
-          </div>
-          <button
-            className={`submit-btn ${canSubmit ? 'active' : 'inactive'}`}
-            disabled={!canSubmit}
-            onClick={() => onAdd(form)}
-          >
-            Add to your bar tab
-          </button>
+          <div className="modal-actions">
+  <button type="submit" className="fab">
+    Add to your bar tab
+  </button>
+  
+  <button 
+    type="button" 
+    className="cancel-link" 
+    onClick={onClose}
+  >
+    Cancel
+  </button>
+</div>
         </div>
       </div>
     </div>
@@ -614,20 +624,22 @@ export default function App() {
             )}
           </div>
         </div>
-
+        {!showAdd && (
+        <Fragment>
         <button className="fab" onClick={() => setShowAdd(true)}>
           + Log a New Beer
         </button>
-
+<h2 className="list-header">Your bar tab</h2>
         <div className="card-list">
           {beers.map((beer) => (
             <BeerCard key={beer.id} beer={beer} onDelete={deleteBeer} />
           ))}
-        </div>
-      </div>
-      {showAdd && (
+        </div></Fragment>
+        )}
+            {showAdd && (
         <AddBeerModal onAdd={addBeer} onClose={() => setShowAdd(false)} />
       )}
+    </div>
     </div>
   );
       }

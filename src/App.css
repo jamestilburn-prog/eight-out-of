@@ -398,3 +398,121 @@ body {
                     transform: translateY(-8px); /* Lifts it up like an exponent */
                       text-transform: uppercase;
 }
+.list-header {
+  color: white;
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 5px 0 15px 5px; /* Top, Right, Bottom, Left */
+  letter-spacing: -0.02em;
+  opacity: 0.9;
+  text-align: left;
+}
+
+.modal-backdrop {
+  /* Ensure this fills the space left by the hidden list */
+  position: relative;
+  width: 100%;
+  min-height: 60vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20px;
+  background: transparent; /* Since the background orbs are still there */
+}
+
+.modal {
+  width: 100%;
+  max-width: 500px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 25px;
+}
+
+.modal-header {
+  padding-bottom:20px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+  text-align: left; /* Keeps everything aligned with your new header */
+}
+
+.label {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.field-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6); /* Faded white for that GDS hint look */
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.input-suffix-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-suffix-wrapper .input {
+  padding-right: 40px; /* Make room for the % sign inside the box */
+  width: 100%;
+}
+
+.input-suffix {
+  position: absolute;
+  right: 15px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
+  pointer-events: none; /* User can click "through" it to focus the input */
+}
+.score-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Space between 8/ and the box */
+}
+
+.score-prefix {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 5px; /* Slight adjustment to align with input center */
+}
+
+.score-eight {
+  padding-right: 20px;
+}
+
+/* Ensure the DenomInput inside doesn't stretch too wide */
+.score-input-group .score-input-field {
+  width: 80px; 
+  text-align: center;
+}
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.cancel-link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: underline;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 10px;
+  transition: color 0.2s;
+}
+
+.cancel-link:hover {
+  color: #ffffff;
+}
