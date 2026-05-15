@@ -2,6 +2,8 @@ import './App.css';
 import { useState, useEffect, useRef } from 'react';
 import { auth, db, logout, loginUser, registerUser } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { sendPasswordResetEmail } from 'firebase/auth';
+
 import {
   collection,
   addDoc,
@@ -85,19 +87,6 @@ const getFriendlyErrorMessage = (code) => {
   }
 };
 
-const handleForgotPassword = async () => {
-  if (!email) {
-    setError('Enter an email address.');
-    return;
-  }
-  try {
-    await resetPassword(email);
-    setError('Check your inbox for a reset link.');
-    // We reuse the error state to show a success message for simplicity
-  } catch (err) {
-    setError(getFriendlyErrorMessage(err.code));
-  }
-};
 
 // --- BADGE
 
@@ -430,6 +419,20 @@ export default function App() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
 
+  const handleForgotPassword = async () => {
+        if (!email) {
+              setError('Enter an email address first.');
+                    return;
+                        }
+                            try {
+                                  await sendPasswordResetEmail(auth, email);
+                                        setError('Check your inbox for a reset link.');
+                                            } catch (err) {
+                                                  setError(getFriendlyErrorMessage(err.code));
+                                                      }
+                                                        };
+  
+
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -458,6 +461,9 @@ export default function App() {
       setError(getFriendlyErrorMessage(err.code));
     }
   };
+
+  
+  
 
   const badge = getBadge(beers.length);
   const nextGoal = getNextGoal(beers.length);
@@ -497,6 +503,7 @@ export default function App() {
         <div className="orb orb-1" />
         <div className="content">
           <header className="header">
+            <div className="release-type">BETA</div>
             <h1 className="header-title">8 out of...</h1>
             <p className="header-sub">Beer scoring but not boring</p>
           </header>
@@ -623,4 +630,4 @@ export default function App() {
       )}
     </div>
   );
-}
+      }
