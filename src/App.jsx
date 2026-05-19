@@ -14,6 +14,7 @@ import {
   orderBy,
   serverTimestamp,
 } from 'firebase/firestore';
+
 // --- CONSTANTS ---
 const STYLES = [
   'Bitter',
@@ -87,16 +88,14 @@ const getFriendlyErrorMessage = (code) => {
   }
 };
 
-
-// --- BADGE
-
+// --- BADGES ---
 const getBadge = (count) => {
-  if (count >= 250) return { text: 'Master Brewer', color: '#FFD700' }; // Gold
-  if (count >= 100) return { text: 'Seasoned Taster', color: '#C0C0C0' }; // Silver
-  if (count >= 25) return { text: 'Committed Drinker', color: '#CD7F32' }; // Bronze
+  if (count >= 250) return { text: 'Master Brewer', color: '#FFD700' };
+  if (count >= 100) return { text: 'Seasoned Taster', color: '#C0C0C0' };
+  if (count >= 25) return { text: 'Committed Drinker', color: '#CD7F32' };
   if (count >= 10) return { text: 'Getting Crafty', color: '#f39c12' };
   if (count >= 3) return { text: 'Beer Curious', color: '#00F5A0' };
-  return null; // No badge yet
+  return null;
 };
 
 const getNextGoal = (count) => {
@@ -107,11 +106,8 @@ const getNextGoal = (count) => {
     { threshold: 100, name: 'Seasoned Taster' },
     { threshold: 250, name: 'Master Brewer' },
   ];
-
-  // Find the first goal that is higher than our current count
   const next = goals.find((g) => g.threshold > count);
-
-  if (!next) return null; // Already a Master Brewer!
+  if (!next) return null;
 
   return {
     remaining: next.threshold - count,
@@ -121,7 +117,6 @@ const getNextGoal = (count) => {
 };
 
 // --- SHARED COMPONENTS ---
-
 const CityLookup = ({ value, onChange }) => {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState([]);
@@ -138,10 +133,9 @@ const CityLookup = ({ value, onChange }) => {
       try {
         const response = await fetch(
           `https://secure.geonames.org/searchJSON?name_startsWith=${query}&maxRows=5&username=jamestilburn&countryBias=GB&featureClass=P&isNameRequired=true`
-        );        
-        const data = await response.json(); 
-        
-        // Corrected parsing logic to ensure names are extracted properly
+        );
+        const data = await response.json();
+
         const names = data.geonames
           ? [...new Set(data.geonames.map((g) => g.name))]
           : [];
@@ -154,14 +148,12 @@ const CityLookup = ({ value, onChange }) => {
     }, 400);
     return () => clearTimeout(timer);
   }, [query]);
-  
 
   return (
     <div className="town-wrap">
       <input
         className="input"
         value={query}
-
         onChange={(e) => {
           setQuery(e.target.value);
           onChange(e.target.value);
@@ -218,42 +210,62 @@ const ScoreDisplay = ({ denom, size = 'md' }) => {
     </div>
   );
 };
+
 const DenomInput = ({ value, onChange }) => {
-  const [raw, setRaw] = useState(String(value));
+  const [raw, setRaw] = useState(value !== undefined && value !== '' ? String(value) : '');
+
+  useEffect(() => {
+    setRaw(value !== undefined && value !== '' ? String(value) : '');
+  }, [value]);
+
   const commit = (str) => {
     const n = parseInt(str, 10);
     if (!isNaN(n) && n >= 8) {
       onChange(n);
       setRaw(String(n));
     } else {
-      onChange(8);
-      setRaw('8');
+      onChange('');
+      setRaw('');
     }
   };
+
   return (
     <div className="score-input-wrap">
-      <div className="score-input-row">
-        <span className="score-eight">8 out of </span>
+      {/* This row now acts as the visual "input field" box */}
+      <div className="score-input-row-inline">
+        <span className="score-inline-prefix">8 /</span>
         <input
           type="number"
           min={8}
+          placeholder="--"
           value={raw}
-          className="score-input-field"
-          onChange={(e) => setRaw(e.target.value)}
+          className="score-input-field-clean"
+          onChange={(e) => {
+            const val = e.target.value;
+            setRaw(val);
+            const n = parseInt(val, 10);
+            if (!isNaN(n) && n >= 8) {
+              onChange(n);
+            } else {
+              onChange('');
+            }
+          }}
           onBlur={(e) => commit(e.target.value)}
         />
       </div>
       <div className="score-meta">
         <span
           className="score-pct"
-          style={{ color: getScoreColor(parseInt(raw)) }}
+          style={{ color: raw ? getScoreColor(parseInt(raw)) : 'rgba(255,255,255,0.3)' }}
         >
-          {(scoreRatio(parseInt(raw) || 8) * 100).toFixed(1)}%
+          {raw ? `${(scoreRatio(parseInt(raw) || 8) * 100).toFixed(1)}%` : '— %'}
         </span>
       </div>
     </div>
   );
+
 };
+
 const BeerCard = ({ beer, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
   const dateStr = beer.createdAt?.seconds
@@ -284,7 +296,6 @@ const BeerCard = ({ beer, onDelete }) => {
             <div className="card-score-col">
               <ScoreDisplay denom={beer.denom} />
               <div className="card-date">{dateStr}</div>
-
               <button
                 className="delete-btn"
                 onClick={(e) => {
@@ -311,19 +322,29 @@ const BeerCard = ({ beer, onDelete }) => {
     </div>
   );
 };
-
 const AddBeerModal = ({ onAdd, onClose }) => {
   const [form, setForm] = useState({
     name: '',
     brewery: '',
-    style: 'Bitter',
-    denom: 8,
+    style: '',
+    denom: '',
     notes: '',
     abv: '',
     pub: '',
     town: '',
   });
-  const canSubmit = form.name.trim() && form.brewery.trim();
+
+  const canSubmit =
+    form.name.trim() !== '' &&
+    form.brewery.trim() !== '' &&
+    form.denom !== '';
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (canSubmit) {
+      onAdd(form);
+    }
+  };
 
   return (
     <div
@@ -334,12 +355,14 @@ const AddBeerModal = ({ onAdd, onClose }) => {
         <h2 className="modal-header">
           <span className="modal-title">Logging a new beer</span>
         </h2>
-        <div className="form">
+        {/* Fixed: Form submission listener added */}
+        <form className="form" onSubmit={handleSubmit}>
           <div className="field">
             <label className="label">Beer Name</label>
             <span className="field-hint">For example Landlord</span>
             <input
               className="input"
+              value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
@@ -348,21 +371,22 @@ const AddBeerModal = ({ onAdd, onClose }) => {
             <span className="field-hint">For example Timothy Taylor</span>
             <input
               className="input"
+              value={form.brewery}
               onChange={(e) => setForm({ ...form, brewery: e.target.value })}
             />
           </div>
+
           <div className="field">
-  <label className="label">Your Score</label>
-  <div className="score-input-group">
+            <label className="label">Your Score</label>
+            <span className="field-hint">The lower the denominator, the better the score</span>
+            <DenomInput
+              value={form.denom}
+              onChange={(v) => setForm({ ...form, denom: v })}
+            />
+          </div>
 
-    <DenomInput
-      value={form.denom}
-      onChange={(v) => setForm({ ...form, denom: v })}
-    />
-  </div>
-</div>
 
-<h3 className="modal-header">Optional details</h3>
+          <h3 className="modal-header">Optional details</h3>
           <div className="field-row">
             <div className="field">
               <label className="label">Style</label>
@@ -371,6 +395,11 @@ const AddBeerModal = ({ onAdd, onClose }) => {
                 value={form.style}
                 onChange={(e) => setForm({ ...form, style: e.target.value })}
               >
+                {/* Clean default placeholder option */}
+                <option value="" disabled hidden>
+                  Select
+                </option>
+
                 {STYLES.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -378,47 +407,55 @@ const AddBeerModal = ({ onAdd, onClose }) => {
                 ))}
               </select>
             </div>
+
+
             <div className="field">
               <label className="label">ABV</label>
               <div className="input-suffix-wrapper">
-              <input
-                className="input"
-                type="number"
-                step="0.1"
-                onChange={(e) => setForm({ ...form, abv: e.target.value })}
-              />
-                 <span className="input-suffix">%</span>
-  </div>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.1"
+                  placeholder="0.0"
+                  value={form.abv}
+                  onChange={(e) => setForm({ ...form, abv: e.target.value })}
+                />
+                <span className="input-suffix">%</span>
+              </div>
             </div>
           </div>
           <div className="field">
             <label className="label">Town / City</label>
+            <span className="field-hint">Where did you drink this?</span>
             <CityLookup
               value={form.town}
               onChange={(v) => setForm({ ...form, town: v })}
             />
           </div>
           <div className="modal-actions">
-  <button type="submit" className="fab">
-    Add to your bar tab
-  </button>
-  
-  <button 
-    type="button" 
-    className="cancel-link" 
-    onClick={onClose}
-  >
-    Cancel
-  </button>
-</div>
-        </div>
+            <button
+              type="submit"
+              className={`fab-submit ${canSubmit ? 'active' : 'inactive'}`}
+              disabled={!canSubmit}
+            >
+              Add to your bar tab
+            </button>
+            <button
+              type="button"
+              className="cancel-link"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+          </div>
+
+        </form>
       </div>
     </div>
   );
 };
 
 // --- MAIN APP ---
-
 export default function App() {
   const [user, setUser] = useState(null);
   const [beers, setBeers] = useState([]);
@@ -428,20 +465,20 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleForgotPassword = async () => {
-        if (!email) {
-              setError('Enter an email address first.');
-                    return;
-                        }
-                            try {
-                                  await sendPasswordResetEmail(auth, email);
-                                        setError('Check your inbox for a reset link.');
-                                            } catch (err) {
-                                                  setError(getFriendlyErrorMessage(err.code));
-                                                      }
-                                                        };
-  
+    if (!email) {
+      setError('Enter an email address first.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setError('Check your inbox for a reset link.');
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err.code));
+    }
+  };
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -472,21 +509,15 @@ export default function App() {
     }
   };
 
-  
-  
-
   const badge = getBadge(beers.length);
   const nextGoal = getNextGoal(beers.length);
+
   const formatLastDate = (beers) => {
     if (beers.length === 0) return 'No beers yet';
-
-    // Since our Firestore query is 'orderBy("createdAt", "desc")',
-    // the first item in the array is always the most recent.
     const lastBeer = beers[0];
     const date = lastBeer.createdAt?.seconds
       ? new Date(lastBeer.createdAt.seconds * 1000)
       : new Date();
-
     return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'long',
@@ -494,11 +525,18 @@ export default function App() {
   };
 
   const addBeer = async (data) => {
-    await addDoc(collection(db, 'users', user.uid, 'beers'), {
-      ...data,
-      createdAt: serverTimestamp(),
-    });
+    setIsSaving(true);
     setShowAdd(false);
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'beers'), {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Error adding beer: ", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const deleteBeer = async (id) => {
@@ -582,21 +620,20 @@ export default function App() {
         <div className="stats-bar">
           <div className="stat-card">
             <div className="stat-label">Logged</div>
-
             <div className="stat-value-lg">{beers.length}</div>
             <br />
             <div className="next-level-text">
               Your last beer was logged on {formatLastDate(beers)}
             </div>
           </div>
+
           <div className="stat-card">
             <div className="stat-label">Avg Score</div>
-
             <div className="stat-value-lg">{formatAvgScore(beers)}</div>
           </div>
+
           <div className="stat-card badge-card">
             <div className="stat-label">Ranking</div>
-
             <div className="stat-value">
               {badge ? (
                 <span style={{ color: badge.color }}>{badge.text}</span>
@@ -624,22 +661,38 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* 1. Only show the Log Button and Bar Tab List if the Add Modal is closed */}
         {!showAdd && (
-        <Fragment>
-        <button className="fab" onClick={() => setShowAdd(true)}>
-          + Log a New Beer
-        </button>
-<h2 className="list-header">Your bar tab</h2>
-        <div className="card-list">
-          {beers.map((beer) => (
-            <BeerCard key={beer.id} beer={beer} onDelete={deleteBeer} />
-          ))}
-        </div></Fragment>
+          <Fragment>
+            <button className="fab" onClick={() => setShowAdd(true)}>
+              + Log a New Beer
+            </button>
+            <h2 className="list-header">Your bar tab</h2>
+            <div className="card-list">
+              {beers.map((beer) => (
+                <BeerCard key={beer.id} beer={beer} onDelete={deleteBeer} />
+              ))}
+            </div>
+          </Fragment>
         )}
-            {showAdd && (
-        <AddBeerModal onAdd={addBeer} onClose={() => setShowAdd(false)} />
-      )}
-    </div>
+
+        {/* 2. Show the Add Form Modal when showAdd is true */}
+        {showAdd && (
+          <AddBeerModal onAdd={addBeer} onClose={() => setShowAdd(false)} />
+        )}
+
+        {/* 3. ONLY show the black overlay when Firestore is actively saving data */}
+        {isSaving && (
+          <div className="saving-overlay">
+            <div className="saving-content">
+              <span className="saving-icon">🍺</span>
+              <p className="saving-text">Adding...</p>
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
-      }
+}
