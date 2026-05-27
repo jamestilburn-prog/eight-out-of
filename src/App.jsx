@@ -259,52 +259,49 @@ const DenomInput = ({ value, onChange }) => {
 
 const BeerCard = ({ beer, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
-  const dateStr = beer.createdAt?.seconds
-    ? new Date(beer.createdAt.seconds * 1000).toLocaleDateString('en-GB')
-    : new Date().toLocaleDateString('en-GB');
 
   return (
     <div className={`beer-card ${expanded ? 'expanded' : ''}`} onClick={() => setExpanded(!expanded)}>
       <div className="card-main">
-        <div className="card-photo card-photo-placeholder"></div>
         <div className="card-body">
           <div className="card-top">
             <div className="card-info">
-              <div className="card-meta">
-                <span className="style-chip">{beer.style}</span>
-              </div>
-              <div className="card-name">{beer.name}</div>
+              <div className="card-name"><strong>{beer.name}</strong></div>
               <div className="card-brewery">{beer.brewery}</div>
-              {(beer.pub || beer.town) && (
-                <div className="card-location">
-                   {[beer.pub, beer.town].filter(Boolean).join(', ')}
-                </div>
-              )}
             </div>
-            <div className="card-score-col">
-              <ScoreDisplay denom={beer.denom} />
-              <div className="card-date">{dateStr}</div>
-              <button
-                className="delete-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(beer.id);
-                }}
-              >
-                Delete
-              </button>
+            <div className="card-meta">
+              <div className="style-chip">
+                {beer.style}
+              </div>
+              <div className="card-details">
+                {beer.abv && <span className="card-detail-item">{beer.abv}% ABV</span>}
+              </div>
+                            {(beer.pub || beer.town) && (
+                <div className="card-location">
+                Quaffed in {[beer.pub, beer.town].filter(Boolean).join(', ')}
+                </div>
+                            )}
+                            
+
+                            
+              <div className="card-score-col"><strong>
+                <ScoreDisplay denom={beer.denom} /></strong>
+              </div>
+              <div className="card-edit">
+                <button
+                  className="delete-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(beer.id);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      {expanded && (
-        <div className="card-expand">
-          {beer.notes && <p className="card-notes">"{beer.notes}"</p>}
-          <div className="card-details">
-            {beer.abv && <span className="card-detail-item"> {beer.abv}% ABV</span>}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -464,194 +461,227 @@ export default function App() {
     });
   }, []);
 
-useEffect(() => {
-  if (!user) return;
-  const q = query(collection(db, 'users', user.uid, 'beers'), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snapshot) => {
-    setBeers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-  });
-}, [user]);
-
-const handleAuth = async (e) => {
-  e.preventDefault();
-  setError('');
-  try {
-    if (isRegistering) {
-      await registerUser(email, password, usernameInput);
-    } else {
-      await loginUser(email, password);
-    }
-  } catch (err) {
-    setError(getFriendlyErrorMessage(err.code));
-  }
-};
-
-const badge = getBadge(beers.length);
-const nextGoal = getNextGoal(beers.length);
-
-const formatLastDate = (beers) => {
-  if (beers.length === 0) return 'No beers yet';
-  const lastBeer = beers[0];
-  const date = lastBeer.createdAt?.seconds ? new Date(lastBeer.createdAt.seconds * 1000) : new Date();
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-};
-
-const addBeer = async (data) => {
-  setIsSaving(true);
-  setShowAdd(false);
-  try {
-    await addDoc(collection(db, 'users', user.uid, 'beers'), {
-      ...data,
-      createdAt: serverTimestamp(),
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'users', user.uid, 'beers'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      setBeers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-  } catch (err) {
-    console.error("Error adding beer: ", err);
-  } finally {
-    setIsSaving(false);
+  }, [user]);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      if (isRegistering) {
+        await registerUser(email, password, usernameInput);
+      } else {
+        await loginUser(email, password);
+      }
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err.code));
+    }
+  };
+
+  const badge = getBadge(beers.length);
+  const nextGoal = getNextGoal(beers.length);
+
+  const formatLastDate = (beers) => {
+    if (beers.length === 0) return 'No beers yet';
+    const lastBeer = beers[0];
+    const date = lastBeer.createdAt?.seconds ? new Date(lastBeer.createdAt.seconds * 1000) : new Date();
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  };
+
+  const addBeer = async (data) => {
+    setIsSaving(true);
+    setShowAdd(false);
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'beers'), {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Error adding beer: ", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteBeer = async (id) => {
+    await deleteDoc(doc(db, 'users', user.uid, 'beers', id));
+  };
+
+  // Execution Conditionals and UI Returns
+  if (loading) return <div className="loading">Pulling it through...</div>;
+
+  if (!user) {
+    return (
+      <div className="app">
+        <div className="orb orb-1" />
+        <div className="content">
+          <header className="header">
+            <div className="release-type">BETA</div>
+            <h1 className="header-title">8 out of...</h1>
+            <p className="header-sub">Beer scoring but not boring</p>
+          </header>
+          <div className="modal" style={{ margin: 'auto' }}>
+            <form onSubmit={handleAuth} className="form">
+              {isRegistering && (
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Username"
+                  required
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  style={{ marginBottom: '10px' }}
+                />
+              )}
+              <input
+                className="input"
+                type="email"
+                placeholder="Email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{ marginBottom: '10px' }}
+              />
+              <input
+                className="input"
+                type="password"
+                placeholder="Password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ marginBottom: '10px' }}
+              />
+              <button className="fab" type="submit" style={{ marginTop: '10px' }}>
+                {isRegistering ? 'Join' : 'Login'}
+              </button>
+            </form>
+            {error && <p className="error-msg">{error}</p>}
+            {!isRegistering && (
+              <p className="forgot-password-link" onClick={handleForgotPassword}>
+                Forgot password?
+              </p>
+            )}
+            <p className="toggle-auth" onClick={() => setIsRegistering(!isRegistering)}>
+              {isRegistering ? 'Have an account?' : 'Need an account?'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
-};
 
-const deleteBeer = async (id) => {
-  await deleteDoc(doc(db, 'users', user.uid, 'beers', id));
-};
-
-// Execution Conditionals and UI Returns
-if (loading) return <div className="loading">Pulling it through...</div>;
-
-if (!user) {
   return (
     <div className="app">
       <div className="orb orb-1" />
+      <div className="orb orb-2" />
       <div className="content">
         <header className="header">
-          <div className="release-type">BETA</div>
-          <h1 className="header-title">8 out of...</h1>
+          <div className="header-eyebrow">
+            <span className="username-tag">@{usernameDisplay}</span>
+            <span onClick={logout} style={{ cursor: 'pointer' }}>Logout</span>
+          </div>
+          <h1 className="header-title"><span>8 out of...</span></h1>
           <p className="header-sub">Beer scoring but not boring</p>
         </header>
-        <div className="modal" style={{ margin: 'auto' }}>
-          <form onSubmit={handleAuth} className="form">
-            {isRegistering && (
-              <input
-                className="input"
-                type="text"
-                placeholder="Username"
-                required
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-                style={{ marginBottom: '10px' }}
-              />
+
+        <div className="stats-bar">
+          <div className="stat-card">
+            <div className="stat-label">Logged</div>
+            <div className="stat-value-lg">{beers.length}</div>
+            <br />
+            <div className="next-level-text">
+              Your last beer was logged on {formatLastDate(beers)}
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Avg Score</div>
+            <div className="stat-value-lg">{formatAvgScore(beers)}</div>
+          </div>
+          <div className="stat-card badge-card">
+            <div className="stat-label">Ranking</div>
+            <div className="stat-value">
+              {badge ? <span style={{ color: badge.color }}>{badge.text}</span> : <span style={{ opacity: 0.3 }}>None</span>}
+            </div>
+            {nextGoal && (
+              <div className="progress-container">
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${nextGoal.percent}%`,
+                      background: badge ? badge.color : '#00F5A0',
+                    }}
+                  />
+                </div>
+                <div className="next-level-text">
+                  Next level in <strong>{nextGoal.remaining}</strong> {nextGoal.remaining === 1 ? 'beer' : 'beers'}
+                </div>
+              </div>
             )}
-            <input
-              className="input"
-              type="email"
-              placeholder="Email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ marginBottom: '10px' }}
-            />
-            <input
-              className="input"
-              type="password"
-              placeholder="Password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ marginBottom: '10px' }}
-            />
-            <button className="fab" type="submit" style={{ marginTop: '10px' }}>
-              {isRegistering ? 'Join' : 'Login'}
-            </button>
-          </form>
-          {error && <p className="error-msg">{error}</p>}
-          {!isRegistering && (
-            <p className="forgot-password-link" onClick={handleForgotPassword}>
-              Forgot password?
-            </p>
-          )}
-          <p className="toggle-auth" onClick={() => setIsRegistering(!isRegistering)}>
-            {isRegistering ? 'Have an account?' : 'Need an account?'}
-          </p>
+          </div>
         </div>
+
+        {!showAdd && (
+          <Fragment>
+            <button className="fab" onClick={() => setShowAdd(true)}>+ Log a New Beer</button>
+            <h2 className="list-header">Your bar tab</h2>
+
+            <div className="card-list">
+              {(() => {
+                // 1. Group the beers array chronologically by date
+                const groups = beers.reduce((acc, beer) => {
+                  const dateKey = beer.createdAt?.seconds
+                    ? new Date(beer.createdAt.seconds * 1000).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })
+                    : new Date().toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    });
+
+                  if (!acc[dateKey]) acc[dateKey] = [];
+                  acc[dateKey].push(beer);
+                  return acc;
+                }, {});
+
+                // 2. Map over each grouped date bucket
+                return Object.entries(groups).map(([date, groupedBeers]) => (
+                  <div key={date} className="date-group-section">
+                    {/* The new section header */}
+                    <h3 className="date-group-header">{date}</h3>
+
+                    {/* The beers consumed on that specific date */}
+                    <div className="date-group-cards">
+                      {groupedBeers.map((beer) => (
+                        <BeerCard key={beer.id} beer={beer} onDelete={deleteBeer} />
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </Fragment>
+        )}
+
+        {showAdd && <AddBeerModal onAdd={addBeer} onClose={() => setShowAdd(false)} />}
+
+        {isSaving && (
+          <div className="saving-overlay">
+            <div className="saving-content">
+              <span className="saving-icon"></span>
+              <p className="saving-text">Adding...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-}
-
-return (
-  <div className="app">
-    <div className="orb orb-1" />
-    <div className="orb orb-2" />
-    <div className="content">
-      <header className="header">
-        <div className="header-eyebrow">
-          <span className="username-tag">@{usernameDisplay}</span>
-          <span onClick={logout} style={{ cursor: 'pointer' }}>Logout</span>
-        </div>
-        <h1 className="header-title"><span>8 out of...</span></h1>
-        <p className="header-sub">Beer scoring but not boring</p>
-      </header>
-
-      <div className="stats-bar">
-        <div className="stat-card">
-          <div className="stat-label">Logged</div>
-          <div className="stat-value-lg">{beers.length}</div>
-          <br />
-          <div className="next-level-text">
-            Your last beer was logged on {formatLastDate(beers)}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Avg Score</div>
-          <div className="stat-value-lg">{formatAvgScore(beers)}</div>
-        </div>
-        <div className="stat-card badge-card">
-          <div className="stat-label">Ranking</div>
-          <div className="stat-value">
-            {badge ? <span style={{ color: badge.color }}>{badge.text}</span> : <span style={{ opacity: 0.3 }}>None</span>}
-          </div>
-          {nextGoal && (
-            <div className="progress-container">
-              <div className="progress-bar">
-                <div
-                  className="progress-fill"
-                  style={{
-                    width: `${nextGoal.percent}%`,
-                    background: badge ? badge.color : '#00F5A0',
-                  }}
-                />
-              </div>
-              <div className="next-level-text">
-                Next level in <strong>{nextGoal.remaining}</strong> {nextGoal.remaining === 1 ? 'beer' : 'beers'}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {!showAdd && (
-        <Fragment>
-          <button className="fab" onClick={() => setShowAdd(true)}>+ Log a New Beer</button>
-          <h2 className="list-header">Your bar tab</h2>
-          <div className="card-list">
-            {beers.map((beer) => (
-              <BeerCard key={beer.id} beer={beer} onDelete={deleteBeer} />
-            ))}
-          </div>
-        </Fragment>
-      )}
-
-      {showAdd && <AddBeerModal onAdd={addBeer} onClose={() => setShowAdd(false)} />}
-
-      {isSaving && (
-        <div className="saving-overlay">
-          <div className="saving-content">
-            <span className="saving-icon"></span>
-            <p className="saving-text">Adding...</p>
-          </div>
-        </div>
-      )}
-    </div>
-  </div>
-);
 }
