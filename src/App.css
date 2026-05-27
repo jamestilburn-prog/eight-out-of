@@ -756,3 +756,12 @@ select.select[value=""] {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+.username-tag {
+  font-weight: 700;
+  color: var(--green);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
