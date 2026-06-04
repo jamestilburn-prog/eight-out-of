@@ -6,6 +6,7 @@ import { sendPasswordResetEmail } from 'firebase/auth';
 
 import {
   collection,
+  collectionGroup,
   addDoc,
   deleteDoc,
   doc,
@@ -257,54 +258,56 @@ const DenomInput = ({ value, onChange }) => {
   );
 };
 
-const BeerCard = ({ beer, onDelete }) => {
+const BeerCard = ({ beer, currentUserUid, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
+  const isOwner = !beer.userUid || currentUserUid === beer.userUid;
 
   return (
     <div className={`beer-card ${expanded ? 'expanded' : ''}`} onClick={() => setExpanded(!expanded)}>
       <div className="card-main">
+        <div className="card-photo card-photo-placeholder">🍺</div>
         <div className="card-body">
           <div className="card-top">
             <div className="card-info">
-              <div className="card-name"><strong>{beer.name}</strong></div>
+              <div className="card-meta">
+                <span className="style-chip">{beer.style}</span>
+                {beer.postedBy && (
+                  <span className="user-chip" style={{ marginLeft: '6px', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', color: '#00F5A0' }}>
+                    @{beer.postedBy}
+                  </span>
+                )}
+              </div>
+              <div className="card-name">{beer.name}</div>
               <div className="card-brewery">{beer.brewery}</div>
-            </div>
-            <div className="card-meta">
-              <div className="style-chip">
-                {beer.style}
-              </div>
-              <div className="card-details">
-                {beer.abv && <span className="card-detail-item">{beer.abv}% ABV</span>}
-              </div>
-                            {(beer.pub || beer.town) && (
+              {(beer.pub || beer.town) && (
                 <div className="card-location">
-                Quaffed in {[beer.pub, beer.town].filter(Boolean).join(', ')}
+                  📍 {[beer.pub, beer.town].filter(Boolean).join(', ')}
                 </div>
-                            )}
-                            
-
-                            
-              <div className="card-score-col"><strong>
-                <ScoreDisplay denom={beer.denom} /></strong>
-              </div>
-              <div className="card-edit">
-                <button
-                  className="delete-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(beer.id);
-                  }}
-                >
+              )}
+            </div>
+            <div className="card-score-col">
+              <ScoreDisplay denom={beer.denom} />
+              {isOwner && (
+                <button className="delete-btn" onClick={(e) => { e.stopPropagation(); onDelete(beer.id); }}>
                   Delete
                 </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+      {expanded && (
+        <div className="card-expand">
+          {beer.notes && <p className="card-notes">"{beer.notes}"</p>}
+          <div className="card-details">
+            {beer.abv && <span className="card-detail-item">🍺 {beer.abv}% ABV</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
 
 const AddBeerModal = ({ onAdd, onClose }) => {
   const [form, setForm] = useState({
@@ -421,6 +424,8 @@ export default function App() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState('dashboard'); // 'dashboard' or 'globalFeed'
+  const [allBeers, setAllBeers] = useState([]);
 
   // All Functions and Hooks Kept inside the component scope
   const handleForgotPassword = async () => {
@@ -468,6 +473,32 @@ export default function App() {
       setBeers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, [user]);
+
+  useEffect(() => {
+    // Import collectionGroup from 'firebase/firestore' at the top of your file
+    if (!user || currentScreen !== 'globalFeed') return;
+
+
+    const q = query(collectionGroup(db, 'beers'), orderBy('createdAt', 'desc'));
+
+    return onSnapshot(q, async (snapshot) => {
+      const beerList = [];
+      for (const d of snapshot.docs) {
+        const beerData = d.data();
+        const userUid = d.ref.parent.parent.id;
+
+        let postedBy = 'Anonymous';
+        try {
+          const profileDoc = await getDoc(doc(db, 'users', userUid));
+          if (profileDoc.exists()) postedBy = profileDoc.data().username;
+        } catch (e) { console.error(e); }
+
+        beerList.push({ id: d.id, userUid, postedBy, ...beerData });
+      }
+      setAllBeers(beerList);
+    });
+  }, [user, currentScreen]);
+
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -575,112 +606,123 @@ export default function App() {
     );
   }
 
+  // Render function to bundle chronological layout logic uniformly
+  const renderChronologicalList = (flatDataset) => {
+    const groups = flatDataset.reduce((acc, beer) => {
+      const dateKey = beer.createdAt?.seconds
+        ? new Date(beer.createdAt.seconds * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      if (!acc[dateKey]) acc[dateKey] = [];
+      acc[dateKey].push(beer);
+      return acc;
+    }, {});
+
+    return Object.entries(groups).map(([date, groupedBeers]) => (
+      <div key={date} className="date-group-section" style={{ marginBottom: '24px' }}>
+        <h3 className="date-group-header" style={{ fontSize: '0.95rem', textTransform: 'uppercase', color: '#FFD60A', marginBottom: '12px', borderLeft: '2px solid #FFD60A', paddingLeft: '6px' }}>{date}</h3>
+        <div className="date-group-cards" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {groupedBeers.map((beer) => (
+            <BeerCard key={beer.id} beer={beer} currentUserUid={user.uid} onDelete={deleteBeer} />
+          ))}
+        </div>
+      </div>
+    ));
+  };
+
+  // MAIN PAGE LAYOUT CONDITION
   return (
     <div className="app">
       <div className="orb orb-1" />
       <div className="orb orb-2" />
       <div className="content">
-        <header className="header">
-          <div className="header-eyebrow">
-            <span className="username-tag">@{usernameDisplay}</span>
-            <span onClick={logout} style={{ cursor: 'pointer' }}>Logout</span>
-          </div>
-          <h1 className="header-title"><span>8 out of...</span></h1>
-          <p className="header-sub">Beer scoring but not boring</p>
-        </header>
 
-        <div className="stats-bar">
-          <div className="stat-card">
-            <div className="stat-label">Logged</div>
-            <div className="stat-value-lg">{beers.length}</div>
-            <br />
-            <div className="next-level-text">
-              Your last beer was logged on {formatLastDate(beers)}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Avg Score</div>
-            <div className="stat-value-lg">{formatAvgScore(beers)}</div>
-          </div>
-          <div className="stat-card badge-card">
-            <div className="stat-label">Ranking</div>
-            <div className="stat-value">
-              {badge ? <span style={{ color: badge.color }}>{badge.text}</span> : <span style={{ opacity: 0.3 }}>None</span>}
-            </div>
-            {nextGoal && (
-              <div className="progress-container">
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${nextGoal.percent}%`,
-                      background: badge ? badge.color : '#00F5A0',
-                    }}
-                  />
-                </div>
-                <div className="next-level-text">
-                  Next level in <strong>{nextGoal.remaining}</strong> {nextGoal.remaining === 1 ? 'beer' : 'beers'}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {!showAdd && (
+        {currentScreen === 'globalFeed' ? (
+          /* --- VIEW A: STANDALONE COMMUNITY SUB-PAGE --- */
           <Fragment>
-            <button className="fab" onClick={() => setShowAdd(true)}>+ Log a New Beer</button>
-            <h2 className="list-header">Your bar tab</h2>
+            <header className="header">
+              <div className="header-eyebrow">
+                <span onClick={() => setCurrentScreen('dashboard')} style={{ cursor: 'pointer', color: '#00F5A0', fontWeight: 'bold' }}>
+                  ← Back to Dashboard
+                </span>
+              </div>
+              <h1 className="header-title"><span>Tasting Notes</span></h1>
+              <p className="header-sub">Other people's wrong opinions</p>
+            </header>
 
-            <div className="card-list">
-              {(() => {
-                // 1. Group the beers array chronologically by date
-                const groups = beers.reduce((acc, beer) => {
-                  const dateKey = beer.createdAt?.seconds
-                    ? new Date(beer.createdAt.seconds * 1000).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })
-                    : new Date().toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    });
+            <main style={{ marginTop: '20px' }}>
+              <div className="card-list">
+                {allBeers.length === 0 ? <p style={{ opacity: 0.5, textAlign: 'center' }}>Loading feed entries...</p> : renderChronologicalList(allBeers)}
+              </div>
+            </main>
+          </Fragment>
+        ) : (
+          /* --- VIEW B: UNTOUCHED PERSONAL WORKSPACE DASHBOARD --- */
+          <Fragment>
+            <header className="header">
+              <div className="header-eyebrow">
+                @{usernameDisplay}
+                <span onClick={logout} style={{ cursor: 'pointer', marginLeft: '12px' }}>Logout</span>
+              </div>
+              <h1 className="header-title"><span>8 out of...</span></h1>
+              <p className="header-sub">Beer scoring but not boring</p>
+            </header>
 
-                  if (!acc[dateKey]) acc[dateKey] = [];
-                  acc[dateKey].push(beer);
-                  return acc;
-                }, {});
-
-                // 2. Map over each grouped date bucket
-                return Object.entries(groups).map(([date, groupedBeers]) => (
-                  <div key={date} className="date-group-section">
-                    {/* The new section header */}
-                    <h3 className="date-group-header">{date}</h3>
-
-                    {/* The beers consumed on that specific date */}
-                    <div className="date-group-cards">
-                      {groupedBeers.map((beer) => (
-                        <BeerCard key={beer.id} beer={beer} onDelete={deleteBeer} />
-                      ))}
+            <div className="stats-bar">
+              <div className="stat-card">
+                <div className="stat-label">Logged</div>
+                <div className="stat-value-lg">{beers.length}</div>
+                <br />
+                <div className="next-level-text">Your last beer was logged on {formatLastDate(beers)}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Avg Score</div>
+                <div className="stat-value-lg">{formatAvgScore(beers)}</div>
+              </div>
+              <div className="stat-card badge-card">
+                <div className="stat-label">Ranking</div>
+                <div className="stat-value">
+                  {badge ? <span style={{ color: badge.color }}>{badge.text}</span> : <span style={{ opacity: 0.3 }}>None</span>}
+                </div>
+                {nextGoal && (
+                  <div className="progress-container">
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${nextGoal.percent}%`, background: badge ? badge.color : '#00F5A0' }} />
                     </div>
+                    <div className="next-level-text">Next level in <strong>{nextGoal.remaining}</strong> {nextGoal.remaining === 1 ? 'beer' : 'beers'}</div>
                   </div>
-                ));
-              })()}
+                )}
+              </div>
             </div>
+
+            <div style={{ display: 'flex', gap: '12px', margin: '20px 0' }}>
+              <button className="fab" style={{ flex: 2, margin: 0 }} onClick={() => setShowAdd(true)}>+ Log a New Beer</button>
+              <button className="fab" style={{ flex: 1, margin: 0, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} onClick={() => setCurrentScreen('globalFeed')}>
+                Tasting Notes
+              </button>
+            </div>
+
+            {!showAdd && (
+              <Fragment>
+                <h2 className="list-header">Your bar tab</h2>
+                <div className="card-list">
+                  {renderChronologicalList(beers)}
+                </div>
+              </Fragment>
+            )}
+
+            {showAdd && <AddBeerModal onAdd={addBeer} onClose={() => setShowAdd(false)} />}
           </Fragment>
         )}
-
-        {showAdd && <AddBeerModal onAdd={addBeer} onClose={() => setShowAdd(false)} />}
 
         {isSaving && (
           <div className="saving-overlay">
             <div className="saving-content">
-              <span className="saving-icon"></span>
+              <span className="saving-icon">🍺</span>
               <p className="saving-text">Adding...</p>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
